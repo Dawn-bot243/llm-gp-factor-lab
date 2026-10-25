@@ -1,0 +1,47 @@
+[project]
+name = "llm-gp-factor-lab"
+version = "0.1.0"
+description = "LLM + GP factor mining research prototype with multi-stage validation"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "pyqlib==0.9.7",
+  "numpy",
+  "pandas",
+  "scipy",
+  "scikit-learn",
+  "lightgbm",
+  "pyyaml",
+  "matplotlib",
+  "statsmodels",
+  "pyarrow",
+  "duckdb",
+  "polars",
+  "pydantic",
+  "python-dotenv",
+  "mlflow",
+  "pytest",
+  "ruff",
+  "mypy",
+  "tqdm",
+  "requests",
+  "akshare>=1.19",
+  "baostock>=0.9",
+  "tushare>=1.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# External data sources are flaky by nature; checks record the exception text
+# and continue instead of aborting the whole report.
+ignore = ["BLE001"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

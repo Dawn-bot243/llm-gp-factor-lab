@@ -1,0 +1,47 @@
+project:
+  name: llm-gp-factor-lab
+  stage: baseline
+  seed: 42
+
+data:
+  provider_uri: D:/qlib_data/cn_data_investment_data/extracted/qlib_bin
+  region: cn
+  instruments: csi300
+  pit_membership: data/processed/pit_csi300_membership.parquet
+  benchmark: SH000300
+  start_time: "2010-01-01"
+  train_end: "2016-12-31"
+  valid_end: "2018-12-31"
+  end_time: "2020-09-23"
+  fit_start_time: "2010-01-01"
+  fit_end_time: "2016-12-31"
+
+model:
+  learning_rate: 0.2
+  colsample_bytree: 0.8879
+  subsample: 0.8789
+  subsample_freq: 1
+  lambda_l1: 205.6999
+  lambda_l2: 580.9768
+  max_depth: 8
+  num_leaves: 210
+  num_threads: 4
+  num_boost_round: 1000
+  early_stopping_rounds: 50
+  verbose_eval: 50
+
+backtest:
+  topk: 50
+  n_drop: 5
+  hold_thresh: 1
+  account: 100000000
+  open_cost: 0.0005
+  close_cost: 0.0015
+  min_cost: 5
+  limit_threshold: 0.095
+  deal_price: close
+  trade_unit: 100
+
+runtime:
+  joblib_backend: threading
+  kernels: 4

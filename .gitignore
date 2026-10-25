@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Project data / outputs
+data/
+artifacts/
+mlruns/
+*.pkl
+*.parquet
+*.zip
+.env
+
+# Reports are local-only (not uploaded to GitHub)
+项目报告/
+reports/local/
+
+# Local run logs
+reports/*.log
