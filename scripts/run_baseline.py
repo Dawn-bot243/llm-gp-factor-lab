@@ -149,7 +149,7 @@ def ic_stats(ic: pd.Series) -> dict[str, Any]:
     mean = float(ic.mean())
     icir = mean / std if std > 0 else float("nan")
     t_stat = mean / std * np.sqrt(len(ic)) if std > 0 else float("nan")
-    newey_west_t = None
+    newey_west_t: float | str | None = None
     try:
         import statsmodels.api as sm
 

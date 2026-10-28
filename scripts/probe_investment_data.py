@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -47,7 +48,7 @@ def main() -> None:
     missing = official.difference(window) if official is not None else None
     missing = missing[(missing >= start) & (missing <= end)] if missing is not None else None
 
-    report = {
+    report: dict[str, Any] = {
         "provider_uri": str(provider),
         "calendar_start": str(calendar.min().date()),
         "calendar_end": str(calendar.max().date()),

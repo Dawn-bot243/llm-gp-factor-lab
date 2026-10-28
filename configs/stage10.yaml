@@ -1,0 +1,126 @@
+# Stage 10: ablation and locked OOS.
+# The OOS window 2020-09-24..2026-10-23 is outside the Stage 1-9 frozen sample
+# (2010-01-01..2020-09-23) and is not used for candidate generation/selection.
+project:
+  name: llm-gp-factor-lab
+  stage: stage10_ablation_oos
+  seed: 42
+
+data:
+  baseline_config: configs/baseline.yaml
+  membership: data/processed/stage10_pit_csi300_membership.parquet
+  constraints: data/processed/stage10_pit_csi300_constraints.parquet
+  fallback_constraints: data/processed/pit_csi300_constraints.parquet
+  start: "2010-01-01"
+  calibration_end: "2018-12-31"
+  # Dolt final_a_stock_limit ends 2023-06-12, so the locked OOS stops there
+  # and keeps full suspension/ST/limit constraints.  Qlib prices extend to
+  # 2026 but are not used without PIT constraints.
+  oos_start: "2020-09-24"
+  oos_end: "2023-06-12"
+  benchmark: SH000300
+  cache_dir: data/processed/factor_cache_stage10
+  min_names: 20
+  kernels: 4
+
+# Fixed search budget: A/B/D use the first 500 evaluations (D is truncated
+# from its original 2000-evaluation ledger to keep the comparison equal);
+# C has 230 accepted LLM candidates and cannot be padded without new LLM calls.
+groups:
+  random:
+    path: data/mining/stage10_random/trials.jsonl
+    kind: trials
+    label: "A random search"
+    budget: 500
+    max_complexity: 10
+  gp_only:
+    path: data/mining/stage10_gp_only/trials.jsonl
+    kind: trials
+    label: "B GP-only"
+    budget: 500
+  llm_only:
+    path: data/mining/stage5_candidates_combined.parquet
+    kind: stage5_candidates
+    label: "C LLM-only"
+    budget: 230
+  llm_gp:
+    path: data/mining/gp_run_full_v2/trials.jsonl
+    kind: trials
+    label: "D LLM+GP"
+    budget: 500
+    max_complexity: 10
+  llm_gp_full:
+    path: data/mining/gp_run_full_v2/trials.jsonl
+    kind: trials
+    label: "D-full LLM+GP (2000, reference)"
+    budget: 2000
+    max_complexity: 10
+
+downstream:
+  top_n: 5
+  min_factors_for_s3: 2
+  fallback_to_top: 2
+  incremental_top_n: 10
+
+s1:
+  calibration_start: "2010-01-01"
+  calibration_end: "2018-12-31"
+  holdout_start: "2020-09-24"
+  holdout_end: "2026-10-23"
+  quantiles: [5, 10]
+  min_names: 20
+  winsorize: 0.01
+  standardize: true
+  decay_horizons: [1]
+  thresholds:
+    min_abs_rank_ic: 0.015
+    min_abs_icir: 0.10
+    min_abs_nw_t: 2.0
+    min_coverage: 0.80
+    min_abs_monotonicity: 0.50
+    max_turnover: 0.60
+    min_year_sign_consistency: 0.55
+    fdr_alpha: 0.10
+
+incremental:
+  alpha158_count: 20
+  ridge_alpha: 1.0
+  sample_date: "2017-06-30"
+  sample_size: 100
+  start: "2010-01-01"
+  end: "2018-12-31"
+
+portfolio:
+  topk: 50
+  n_drop: 5
+  hold_thresh: 5
+  account: 100000000
+  deal_price: open
+  signal_lag: 1
+  sizing: equal
+  min_names: 20
+  costs:
+    commission_bps_buy: 2.5
+    commission_bps_sell: 2.5
+    stamp_duty_bps_sell: 10.0
+    transfer_fee_bps: 0.1
+    slippage_bps_buy: 5.0
+    slippage_bps_sell: 5.0
+    min_commission: 5.0
+    lot_size: 100
+    enabled: true
+  constraints:
+    exclude_suspended: true
+    exclude_st: true
+    block_buy_at_limit_up: true
+    block_sell_at_limit_down: true
+    block_all_at_limit: false
+    t_plus_one: true
+    adv_participation: 0.10
+    adv_window: 20
+
+oos:
+  # Written into protocol.json before any OOS evaluation.
+  lock_file: artifacts/stage10/oos_lock.json
+  protocol_file: artifacts/stage10/protocol.json
+  force: false

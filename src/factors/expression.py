@@ -49,7 +49,6 @@ _OPERATOR_ARITY: dict[str, tuple[int, int]] = {
     "Sign": (1, 1),
     "Log": (1, 1),
     "Not": (1, 1),
-    "Mask": (2, 2),
     "If": (3, 3),
     # pair-wise
     "Power": (2, 2),
@@ -103,6 +102,7 @@ BLOCKED_OPERATORS: frozenset[str] = frozenset(
     {
         "Feature",
         "PFeature",
+        "Mask",
         "P",
         "PRef",
         "ChangeInstrument",
@@ -142,6 +142,61 @@ _ROLLING_WINDOW = frozenset(
     }
 )
 _PAIR_ROLLING_WINDOW = frozenset({"Corr", "Cov"})
+
+# Operators whose first argument must be a series.  Qlib's element-wise and
+# rolling operators call ``feature.load(...)``; a bare scalar makes that fail
+# only at evaluation time (e.g. Log(2)), so reject it statically.
+_SERIES_FIRST_OPS = frozenset(
+    {
+        "Abs",
+        "Sign",
+        "Log",
+        "Not",
+        "Ref",
+        "Mean",
+        "Sum",
+        "Std",
+        "Var",
+        "Skew",
+        "Kurt",
+        "Max",
+        "IdxMax",
+        "Min",
+        "IdxMin",
+        "Quantile",
+        "Med",
+        "Mad",
+        "Rank",
+        "Count",
+        "Delta",
+        "Slope",
+        "Rsquare",
+        "Resi",
+        "WMA",
+        "EMA",
+    }
+)
+_PAIR_SERIES_OPS = frozenset(
+    {
+        "Power",
+        "Add",
+        "Sub",
+        "Mul",
+        "Div",
+        "Greater",
+        "Less",
+        "Gt",
+        "Ge",
+        "Lt",
+        "Le",
+        "Eq",
+        "Ne",
+        "And",
+        "Or",
+    }
+)
+_LOGICAL_SERIES_OPS = frozenset({"And", "Or"})
+_BOOL_SERIES_OPS = frozenset({"Gt", "Ge", "Lt", "Le", "Eq", "Ne"})
 _MIN_WINDOW: dict[str, int] = {
     "Std": 2,
     "Var": 2,
@@ -269,8 +324,13 @@ def validate_expression(
         raise ExpressionSyntaxError("dunder names are not allowed")
     if raw.count("$") != len(_FIELD_RE.findall(raw)):
         raise UnsupportedFieldError("every '$' must start a valid field name, e.g. $close")
+    for blocked in BLOCKED_OPERATORS:
+        if re.search(rf"(?<![A-Za-z0-9_]){re.escape(blocked)}\s*\(", raw):
+            raise UnsupportedOperatorError(f"operator '{blocked}' is deliberately blocked")
 
     fields = tuple(dict.fromkeys(match.group(1) for match in _FIELD_RE.finditer(raw)))
+    if not fields:
+        raise ExpressionSyntaxError("expression must reference at least one field, e.g. $close")
     allowed = _normalize_fields(DEFAULT_FIELDS if allowed_fields is None else allowed_fields)
     unknown = [name for name in fields if name not in allowed]
     if unknown:
@@ -429,6 +489,34 @@ class _ValidationState:
         raise ExpressionSyntaxError(f"syntax element '{type(node).__name__}' is not allowed")
 
     def _check_operator_args(self, name: str, args: list[ast.expr]) -> None:
+        if name in _SERIES_FIRST_OPS and not self._is_series(args[0]):
+            raise ExpressionSyntaxError(
+                f"{name} requires a series expression as its first argument, got a scalar constant"
+            )
+        if name == "If" and not self._is_bool_series(args[0]):
+            raise ExpressionSyntaxError(
+                "If requires a boolean series condition; use Gt/Ge/Lt/Le/Eq/Ne or >, not Greater/Less"
+            )
+        if name == "Not" and not self._is_bool_series(args[0]):
+            raise ExpressionSyntaxError(
+                "Not requires a boolean series; use Gt/Ge/Lt/Le/Eq/Ne or >, not Greater/Less"
+            )
+        if name in _PAIR_SERIES_OPS:
+            left, right = args[0], args[1]
+            if name in _LOGICAL_SERIES_OPS:
+                if not (self._is_bool_series(left) and self._is_bool_series(right)):
+                    raise ExpressionSyntaxError(
+                        f"{name} requires two boolean series; use Gt/Ge/Lt/Le/Eq/Ne or >, "
+                        "not Greater/Less"
+                    )
+            elif not (self._is_series(left) or self._is_series(right)):
+                raise ExpressionSyntaxError(
+                    f"{name} requires at least one series operand, got two scalar constants"
+                )
+        if name in _PAIR_ROLLING_WINDOW and not (
+            self._is_series(args[0]) and self._is_series(args[1])
+        ):
+            raise ExpressionSyntaxError(f"{name} requires two series expressions")
         if name == "Ref":
             shift = self._int_literal(args[1], "Ref shift")
             if shift < 0:
@@ -474,6 +562,57 @@ class _ValidationState:
                 raise ExpressionSyntaxError(f"EMA alpha must be in (0, 1], got {alpha}")
             return
 
+    def _is_series(self, node: ast.expr) -> bool:
+        """Best-effort static check: does this subtree produce a Qlib series?"""
+        if isinstance(node, ast.Name):
+            return True
+        if isinstance(node, ast.Constant):
+            return False
+        if isinstance(node, ast.BinOp):
+            return self._is_series(node.left) or self._is_series(node.right)
+        if isinstance(node, ast.UnaryOp):
+            return self._is_series(node.operand)
+        if isinstance(node, ast.Compare):
+            return self._is_series(node.left) or any(
+                self._is_series(item) for item in node.comparators
+            )
+        if isinstance(node, ast.Call):
+            name = node.func.id if isinstance(node.func, ast.Name) else ""
+            if name in _SERIES_FIRST_OPS:
+                return bool(node.args) and self._is_series(node.args[0])
+            if name in _PAIR_SERIES_OPS:
+                return len(node.args) >= 2 and any(
+                    self._is_series(item) for item in node.args[:2]
+                )
+            if name in _PAIR_ROLLING_WINDOW:
+                return len(node.args) >= 2 and any(
+                    self._is_series(item) for item in node.args[:2]
+                )
+            if name == "If":
+                return bool(node.args) and self._is_bool_series(node.args[0])
+        return False
+
+    def _is_bool_series(self, node: ast.expr) -> bool:
+        """Best-effort static check: does this subtree produce a boolean series?"""
+        if isinstance(node, ast.Compare):
+            return self._is_series(node.left) or any(
+                self._is_series(item) for item in node.comparators
+            )
+        if isinstance(node, ast.Call):
+            name = node.func.id if isinstance(node.func, ast.Name) else ""
+            if name in _BOOL_SERIES_OPS:
+                return len(node.args) >= 2 and any(
+                    self._is_series(item) for item in node.args[:2]
+                )
+            if name == "Not":
+                return bool(node.args) and self._is_bool_series(node.args[0])
+            if name in _LOGICAL_SERIES_OPS:
+                return len(node.args) >= 2 and (
+                    self._is_bool_series(node.args[0])
+                    and self._is_bool_series(node.args[1])
+                )
+        return False
+
     def _int_literal(self, node: ast.expr, label: str) -> int:
         value = self._signed_constant(node)
         if isinstance(value, bool) or not isinstance(value, int):
@@ -490,7 +629,7 @@ class _ValidationState:
 
     @staticmethod
     def _signed_constant(node: ast.expr) -> int | float:
-        if isinstance(node, ast.Constant):
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
             return node.value
         if (
             isinstance(node, ast.UnaryOp)

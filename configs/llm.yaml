@@ -1,0 +1,35 @@
+# Stage 5 LLM generation.
+# The API key is read from the environment named by llm.api_key_env and is
+# never written to the repository or ledger.
+llm:
+  provider: anthropic
+  base_url: null          # null -> ANTHROPIC_BASE_URL
+  model: null             # null -> ANTHROPIC_MODEL
+  api_key_env: null          # null -> ANTHROPIC_AUTH_TOKEN, then DEEPSEEK_API_KEY
+  auth_style: both
+  temperature: 0.8
+  max_tokens: 16384
+  timeout_seconds: 180
+  max_retries: 3
+  requests_per_minute: 20
+  max_cost_usd: 5.0
+  max_calls: 80
+  input_price_per_mtok: null
+  output_price_per_mtok: null
+
+generation:
+  n: 200
+  batch_size: 5
+  prompt_version: stage5.v3
+  categories: [momentum, reversal, volatility, liquidity, volume_price, price_pattern, risk_adjusted]
+
+screening:
+  enabled: true
+  data_start: "2016-01-01"
+  data_end: "2020-09-23"
+  calibration_start: "2017-01-01"
+  calibration_end: "2018-12-31"
+  holdout_start: "2019-01-01"
+  holdout_end: "2020-09-23"
+  decay_horizons: [1, 5, 10]
+  min_names: 20

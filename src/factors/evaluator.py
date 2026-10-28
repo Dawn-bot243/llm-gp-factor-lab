@@ -175,6 +175,40 @@ class EvaluationResult:
         return str(self.metrics["expression_hash"])
 
 
+def load_factor(
+    expression: str,
+    config: EvaluationConfig,
+    *,
+    allowed_fields: Iterable[str] | None = None,
+) -> tuple[ValidatedExpression, pd.DataFrame]:
+    """Validate an expression and return its cached daily factor panel."""
+    validated = validate_expression(expression, allowed_fields=allowed_fields)
+    return validated, _load_or_compute_factor(validated, config)
+
+
+def load_close_panel(config: EvaluationConfig) -> pd.DataFrame:
+    """Load the adjusted close panel on the PIT membership, without labels."""
+    frame = load_qlib_panel(["$close"], ["close"], config)
+    frame = _filter_membership(frame, config.membership_path)
+    return normalize_panel(frame)
+
+
+def load_feature_panel(
+    expression: str,
+    name: str,
+    config: EvaluationConfig,
+) -> pd.DataFrame:
+    """Load an arbitrary Qlib field/expression on the PIT membership."""
+    frame = load_qlib_panel([expression], [name], config)
+    frame = _filter_membership(frame, config.membership_path)
+    return normalize_panel(frame)
+
+
+def membership_row_count(config: EvaluationConfig) -> int:
+    """Return PIT membership rows in the configured date range."""
+    return _membership_row_count(config.membership_path, config.start, config.end)
+
+
 def evaluate_expression(
     expression: str,
     config: EvaluationConfig,
@@ -183,8 +217,7 @@ def evaluate_expression(
     allowed_fields: Iterable[str] | None = None,
 ) -> EvaluationResult:
     """Validate, load and evaluate one expression."""
-    validated = validate_expression(expression, allowed_fields=allowed_fields)
-    factor = _load_or_compute_factor(validated, config)
+    validated, factor = load_factor(expression, config, allowed_fields=allowed_fields)
     labels = _load_or_compute_labels(config)
     panel = factor.join(labels, how="left")
     panel = normalize_panel(panel)

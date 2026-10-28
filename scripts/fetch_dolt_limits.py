@@ -56,11 +56,11 @@ def _fetch_chunk(
         if refresh or not (cache_dir / f"{date}.json").exists()
     ]
     if not missing:
-        rows = 0
+        cached_rows = 0
         for date in dates:
             payload = json.loads((cache_dir / f"{date}.json").read_text(encoding="utf-8"))
-            rows += len(payload.get("rows", []))
-        return {"dates": dates, "rows": rows, "status": "cache"}
+            cached_rows += len(payload.get("rows", []))
+        return {"dates": dates, "rows": cached_rows, "status": "cache"}
     codes = sorted({code for date in missing for code in membership_groups[date]})
     start, end = min(missing), max(missing)
     base_query = (
@@ -188,6 +188,7 @@ def main() -> None:
         "output": str(output),
         "errors": errors[:20],
     }
+    (Path(args.raw_dir) / "manifests").mkdir(parents=True, exist_ok=True)
     (Path(args.raw_dir) / "manifests" / "dolt_limits.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )

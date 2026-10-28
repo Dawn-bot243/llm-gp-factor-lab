@@ -1,0 +1,14 @@
+# Stage 7: semantic de-duplication, factor-value clustering and
+# Alpha158 orthogonalization.
+dedupe:
+  corr_threshold: 0.7
+  semantic_threshold: 0.6
+  sample_date: "2017-06-30"
+  sample_size: 100
+  start: "2017-01-01"
+  end: "2018-12-31"
+  min_names: 20
+
+orthogonalize:
+  alpha158_count: 20
+  ridge_alpha: 1.0

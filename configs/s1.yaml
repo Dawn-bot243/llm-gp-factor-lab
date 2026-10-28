@@ -1,0 +1,27 @@
+# Stage 4 S1 single-factor standardization.
+# Thresholds are calibrated against known factors (20d momentum, 5d reversal,
+# 20d low volatility) on the 2010-2018 calibration window.  The 2019-2020
+# holdout is reported but not used to tune the screen.
+s1:
+  quantiles: [5, 10]
+  min_names: 20
+  winsorize: 0.01
+  standardize: true
+  decay_horizons: [1, 2, 3, 5, 10, 20]
+
+  calibration:
+    start: "2010-01-01"
+    end: "2018-12-31"
+  holdout:
+    start: "2019-01-01"
+    end: "2020-09-23"
+
+  thresholds:
+    min_abs_rank_ic: 0.015
+    min_abs_icir: 0.10
+    min_abs_nw_t: 2.0
+    min_coverage: 0.80
+    min_abs_monotonicity: 0.50
+    max_turnover: 0.60
+    min_year_sign_consistency: 0.55
+    fdr_alpha: 0.10

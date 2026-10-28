@@ -216,7 +216,7 @@ def main() -> None:
             report["external"]["errors"].append(f"baostock_daily: {type(exc).__name__}: {exc}")
 
         sample_codes = select_sample(universe, args.sample_size, args.seed)
-        ak_daily: dict[str, pd.DataFrame] = {}
+        ak_daily = {}
         ak_qfq: dict[str, pd.DataFrame] = {}
         ak_raw_status = None
 

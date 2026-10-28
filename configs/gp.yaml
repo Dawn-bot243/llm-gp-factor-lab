@@ -1,0 +1,31 @@
+# Stage 6 GP evolution.
+gp:
+  population_size: 100
+  generations: 20
+  elite_size: 5
+  tournament_size: 3
+  crossover_rate: 0.8
+  mutation_rate: 0.2
+  max_depth: 6
+  max_nodes: 30
+  budget: 2000
+  seed_count: 10
+  inject_every: 5
+  seed: 42
+  max_child_retries: 20
+  hall_max_corr: 0.80
+
+data:
+  sample_date: "2017-06-30"
+  sample_size: 100
+  start: "2017-01-01"
+  end: "2018-12-31"
+
+fitness:
+  min_names: 20
+  min_dates: 300
+  quantile: 5
+  ic_weight: 1.0
+  icir_weight: 0.5
+  turnover_penalty: 0.05
+  complexity_penalty: 0.0005

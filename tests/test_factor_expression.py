@@ -62,6 +62,15 @@ def test_lookahead_ref_is_rejected():
         ("$close; $open", ExpressionSyntaxError),
         ("Quantile($close, 20, 1.5)", ExpressionSyntaxError),
         ("EMA($close, 2)", ExpressionSyntaxError),
+        ("Log(2)", ExpressionSyntaxError),
+        ("Mean(2, 5)", ExpressionSyntaxError),
+        ("2 + 3", ExpressionSyntaxError),
+        ("If(1, $close, $open)", ExpressionSyntaxError),
+        ("Corr($close, 2, 20)", ExpressionSyntaxError),
+        ("Mask($close, $open)", UnsupportedOperatorError),
+        ("If(Greater($close, $open), $close, $open)", ExpressionSyntaxError),
+        ("And(Greater($close, $open), Greater($close, $high))", ExpressionSyntaxError),
+        ("Not(Greater($close, $open))", ExpressionSyntaxError),
     ],
 )
 def test_invalid_expressions_are_rejected(expression: str, error: type[Exception]):
@@ -135,7 +144,6 @@ def test_all_allowed_operators_parse_in_qlib():
         "Sign": "Sign($close)",
         "Log": "Log($close)",
         "Not": "Not($close > $open)",
-        "Mask": "Mask($close, $close > $open)",
         "If": "If($close > $open, $close, $open)",
         "Power": "Power($close, 2)",
         "Add": "Add($close, $open)",

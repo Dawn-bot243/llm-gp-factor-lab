@@ -1,0 +1,112 @@
+# Stage 9: S3 portfolio construction.
+# Train 2010-2016, validation 2017-2018, test 2019-2020-09-23.
+# Signs/weights and TopkDropout parameters are fitted/tuned without test data.
+project:
+  name: llm-gp-factor-lab
+  stage: stage9_s3
+  seed: 42
+
+data:
+  baseline_config: configs/baseline.yaml
+  stage8_scorecard: artifacts/stage8/s2_scorecard.csv
+  stage8_status: pass
+  start: "2010-01-01"
+  train_end: "2016-12-31"
+  valid_start: "2017-01-01"
+  valid_end: "2018-12-31"
+  test_start: "2019-01-01"
+  end: "2020-09-23"
+  benchmark: SH000300
+  winsorize: 0.01
+  standardize: true
+  min_names: 20
+  min_dates: 100
+
+combination:
+  methods: [equal, icir, lgbm]
+  label: open_to_open
+  lgbm:
+    n_estimators: 300
+    learning_rate: 0.03
+    num_leaves: 31
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_samples: 50
+    reg_lambda: 1.0
+
+portfolio:
+  account: 100000000
+  deal_price: open
+  signal_lag: 1
+  sizing: equal
+  risk_degree: 0.95
+  min_names: 20
+  costs:
+    commission_bps_buy: 2.5
+    commission_bps_sell: 2.5
+    stamp_duty_bps_sell: 10.0
+    transfer_fee_bps: 0.1
+    slippage_bps_buy: 5.0
+    slippage_bps_sell: 5.0
+    min_commission: 5.0
+    lot_size: 100
+    amount_unit: 1000.0
+    enabled: true
+  constraints:
+    exclude_suspended: true
+    exclude_st: true
+    block_buy_at_limit_up: true
+    block_sell_at_limit_down: true
+    block_all_at_limit: false
+    t_plus_one: true
+    adv_participation: 0.10
+    adv_window: 20
+
+grid:
+  topk: [30, 50, 80]
+  n_drop: [3, 5, 10]
+  hold_thresh: [1, 5, 10]
+
+scenarios:
+  gross:
+    description: "zero costs, full constraints"
+    costs:
+      enabled: false
+  high_slippage:
+    description: "20bp slippage on each side"
+    costs:
+      slippage_bps_buy: 20.0
+      slippage_bps_sell: 20.0
+  no_constraints:
+    description: "base costs, no ST/limit/T+1/ADV blocks"
+    constraints:
+      exclude_suspended: false
+      exclude_st: false
+      block_buy_at_limit_up: false
+      block_sell_at_limit_down: false
+      block_all_at_limit: false
+      t_plus_one: false
+      adv_participation: 0.0
+  no_adv:
+    description: "base costs and constraints, ADV cap disabled"
+    constraints:
+      adv_participation: 0.0
+  no_t1:
+    description: "base costs and constraints, T+1 disabled"
+    constraints:
+      t_plus_one: false
+
+capacity:
+  aum_scales: [0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0]
+  min_fill_rate: 0.95
+  min_ir_retention: 0.50
+
+attribution:
+  sector_map: data/processed/sector_map.parquet
+  size_quantiles: 5
+  min_names: 20
+
+reconciliation:
+  enabled: true
+  qlib_start: "2019-01-01"
+  qlib_end: "2020-09-23"

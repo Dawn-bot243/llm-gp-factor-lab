@@ -1,0 +1,21 @@
+# Stage 8 S2 robustness gates.
+s2:
+  train_years: 3
+  valid_years: 1
+  test_years: 1
+  embargo_days: 2
+  min_names: 20
+  placebo_iterations: 100
+  sensitivity_scales: [0.5, 1.5]
+  n_trials: 2000
+  quantile: 5
+  gates:
+    min_folds: 5
+    min_positive_fold_ratio: 0.60
+    min_mean_signed_ic: 0.010
+    min_sign_consistency: 0.60
+    max_placebo_p: 0.05
+    max_fdr_q: 0.10
+    min_dsr: 0.00
+    min_yearly_positive_ratio: 0.55
+    max_sensitivity_cv: 0.80

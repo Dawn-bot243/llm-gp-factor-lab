@@ -1,0 +1,148 @@
+# Stage 10C: first use of the 2023-06-13..2026-10-23 OOS.
+#
+# Stage 10/10B used 2020-09-24..2023-06-12, which is no longer pristine.  This
+# run evaluates the same search ledgers on a later, previously unused window.
+#
+# Constraints: zzshare's free daily endpoint supplies exchange limit prices
+# (high_limit/low_limit), is_st and is_paused for 2023-2026.  Dolt's
+# final_a_stock_limit table stops at 2023-06-12, so it cannot cover this window.
+# The panel is built by scripts/build_stage10c_constraints.py from cached
+# responses under data/raw/zzshare/daily/.
+#
+# Search: no new search budget.  The Stage 10B ledgers are reused so the only
+# change is the evaluation window.  A/B keep 3 seeds x 230; C keeps 230 accepted
+# candidates; D keeps the first 230 trials of the 2000-trial ledger.
+project:
+  name: llm-gp-factor-lab
+  stage: stage10c_oos_2023_2026
+  seed: 42
+
+data:
+  baseline_config: configs/baseline.yaml
+  membership: data/processed/stage10_pit_csi300_membership.parquet
+  constraints: data/processed/stage10c_pit_csi300_constraints.parquet
+  fallback_constraints: data/processed/stage10c_pit_csi300_constraints.parquet
+  stage5_scorecard: data/mining/stage5_combined_scorecard.csv
+  start: "2010-01-01"
+  calibration_end: "2016-12-31"
+  selection_start: "2017-01-01"
+  selection_end: "2018-12-31"
+  oos_start: "2023-06-13"
+  oos_end: "2026-10-23"
+  benchmark: SH000300
+  cache_dir: data/processed/factor_cache_stage10c
+  min_names: 20
+  kernels: 4
+
+groups:
+  random:
+    kind: trials
+    label: "A random search"
+    budget: 230
+    max_complexity: 12
+    max_expression_length: 60
+    per_seed_pool: 30
+    paths:
+      - data/mining/stage10b_random_seed101/trials.jsonl
+      - data/mining/stage10b_random_seed102/trials.jsonl
+      - data/mining/stage10b_random_seed103/trials.jsonl
+  gp_only:
+    kind: trials
+    label: "B GP-only"
+    budget: 230
+    max_complexity: 12
+    max_expression_length: 60
+    per_seed_pool: 30
+    paths:
+      - data/mining/stage10b_gp_seed201/trials.jsonl
+      - data/mining/stage10b_gp_seed202/trials.jsonl
+      - data/mining/stage10b_gp_seed203/trials.jsonl
+  llm_only:
+    kind: stage5_candidates
+    label: "C LLM-only"
+    budget: 230
+    path: data/mining/stage5_candidates_combined.parquet
+  llm_gp:
+    kind: trials
+    label: "D LLM+GP"
+    budget: 230
+    max_complexity: 12
+    max_expression_length: 60
+    path: data/mining/gp_run_full_v2/trials.jsonl
+
+downstream:
+  top_n: 30
+  pool_multiplier: 3
+  min_coverage: 0.80
+  correlation_threshold: 0.70
+  min_factors_for_s3: 2
+  s3_statuses: ["pass"]
+  allow_fallback: false
+  incremental_top_n: 10
+
+s1:
+  worker: true
+  worker_timeout: 60
+  calibration_start: "2010-01-01"
+  calibration_end: "2016-12-31"
+  holdout_start: "2023-06-13"
+  holdout_end: "2026-10-23"
+  quantiles: [5, 10]
+  min_names: 20
+  winsorize: 0.01
+  standardize: true
+  decay_horizons: [1]
+  thresholds:
+    min_abs_rank_ic: 0.015
+    min_abs_icir: 0.10
+    min_abs_nw_t: 2.0
+    min_coverage: 0.80
+    min_abs_monotonicity: 0.50
+    max_turnover: 0.60
+    min_year_sign_consistency: 0.55
+    fdr_alpha: 0.10
+  sensitivity:
+    ic_thresholds: [0.010, 0.0125, 0.015]
+    coverage_thresholds: [0.70, 0.80]
+
+incremental:
+  alpha158_count: 20
+  ridge_alpha: 1.0
+  sample_date: "2017-06-30"
+  sample_size: 100
+  start: "2010-01-01"
+  end: "2016-12-31"
+
+portfolio:
+  topk: 50
+  n_drop: 5
+  hold_thresh: 5
+  account: 100000000
+  deal_price: open
+  signal_lag: 1
+  sizing: equal
+  min_names: 20
+  costs:
+    commission_bps_buy: 2.5
+    commission_bps_sell: 2.5
+    stamp_duty_bps_sell: 10.0
+    transfer_fee_bps: 0.1
+    slippage_bps_buy: 5.0
+    slippage_bps_sell: 5.0
+    min_commission: 5.0
+    lot_size: 100
+    enabled: true
+  constraints:
+    exclude_suspended: true
+    exclude_st: true
+    block_buy_at_limit_up: true
+    block_sell_at_limit_down: true
+    block_all_at_limit: false
+    t_plus_one: true
+    adv_participation: 0.10
+    adv_window: 20
+
+oos:
+  lock_file: artifacts/stage10c/oos_lock.json
+  protocol_file: artifacts/stage10c/protocol.json
+  force: false
